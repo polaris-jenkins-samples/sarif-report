@@ -1,0 +1,44 @@
+@Library('blackduck-logs-publisher') _
+
+pipeline {
+    agent { label 'mac-sh' }
+
+    stages {
+        stage("Build") {
+            steps {
+                script {
+                    echo "JOB_NAME: ${env.JOB_NAME}"
+
+                    dir('nodejs-npm') {
+                        sh 'node --version'
+                        sh 'npm --version'
+                        sh 'npm install'
+                    }
+                }
+            }
+        }
+
+        stage("polaris-sarif-report") {
+            steps {
+                script {
+                    dir('nodejs-npm') {
+                        security_scan polaris_assessment_types: 'SAST,SCA', polaris_reports_sarif_create: true, polaris_reports_sarif_groupSCAIssues: true, 
+                        polaris_reports_sarif_severities: 'CRITICAL,HIGH', polaris_waitForScan: true, product: 'polaris'
+
+                        
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            pushJenkinsLogsToGitHub([
+                githubOrg: 'polaris-jenkins-samples',
+                repoName: 'sarif-report',
+                retentionCount: 5
+            ])
+        }
+    }
+}
